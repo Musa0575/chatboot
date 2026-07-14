@@ -1,23 +1,38 @@
-import tkinter as tk
-from tkinter import scrolledtext
+import streamlit as st
 from groq import Groq
 
 # ==========================================
-# 1. KONFIGURASI API GROQ
+# 1. KONFIGURASI HALAMAN WEB STREAMLIT
 # ==========================================
-# Masukkan API Key dari Groq Console kamu di sini
-GROQ_API_KEY = "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"
+st.set_page_config(
+    page_title="InfoBot AI - Asisten Informatika", 
+    page_icon="💻", 
+    layout="centered"
+)
+
+# Judul Header Aplikasi (Menggantikan tk.Label)
+st.title("💻 Chatboot Asisten Belajar Informatika (By Musa)")
+st.write("Tanyakan apa saja seputar materi Informatika, pemrograman, atau logika komputer!")
+st.markdown("---")
+
+# ==========================================
+# 2. KONFIGURASI & INTEGRASI API GROQ
+# ==========================================
+# Membaca API Key dengan aman (Otomatis beralih antara server Streamlit Cloud / Lokal)
+if "GROQ_API_KEY" in st.secrets:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+else:
+    # Isikan API Key kamu di sini jika dijalankan secara lokal di komputer sendiri
+    GROQ_API_KEY = "PASTE_API_KEY_GROQ_KAMU_DI_SINI"
 
 # Inisialisasi Klien Groq
-try:
-    client = Groq(api_key=GROQ_API_KEY)
-except Exception as e:
-    print(f"Gagal inisialisasi API Groq: {e}")
-
-# ... (kode impor library dan API_KEY di atasnya tetap sama) ...
+if "groq_client" not in st.session_state:
+    try:
+        st.session_state.groq_client = Groq(api_key=GROQ_API_KEY)
+    except Exception as e:
+        st.error(f"Gagal inisialisasi API Groq: {e}")
 
 def dapatkan_jawaban_ai(pesan_user):
-    # <<< GANTI BAGIAN INI DENGAN YANG BARU >>>
     instruksi_peran = (
         "Kamu adalah InfoBot, seorang asisten guru Informatika yang ramah, interaktif, dan sangat pintar. "
         "Tugasmu adalah menjawab pertanyaan pengguna seputar Informatika / Ilmu Komputer dengan jelas. "
@@ -31,27 +46,19 @@ def dapatkan_jawaban_ai(pesan_user):
     )
     
     try:
-        
-# ... (sisa kode ke bawahnya tetap sama semua) ...
-        # Menggunakan model 'llama-3.3-70b-versatile' yang sangat pintar dan gratis di Groq
-        chat_completion = client.chat.completions.create(
+        # Menggunakan model 'llama-3.3-70b-versatile'
+        chat_completion = st.session_state.groq_client.chat.completions.create(
             messages=[
-                {
-                    "role": "system",
-                    "content": instruksi_peran
-                },
-                {
-                    "role": "user",
-                    "content": pesan_user
-                }
+                {"role": "system", "content": instruksi_peran},
+                {"role": "user", "content": pesan_user}
             ],
-            model="llama-3.3-70b-versatile", # Model Llama 3.3 yang cerdas dan cepat
+            model="llama-3.3-70b-versatile",
         )
         return chat_completion.choices[0].message.content
     except Exception as e:
-        # Jika model 70b sedang padat, kita gunakan fallback model Llama 3.1 8B yang super cepat
+        # Fallback model jika server utama sibuk
         try:
-            chat_completion = client.chat.completions.create(
+            chat_completion = st.session_state.groq_client.chat.completions.create(
                 messages=[
                     {"role": "system", "content": instruksi_peran},
                     {"role": "user", "content": pesan_user}
@@ -63,102 +70,44 @@ def dapatkan_jawaban_ai(pesan_user):
             return f"Waduh, koneksi ke Groq terputus nih. Error: {err_fallback}"
 
 # ==========================================
-# 2. ANTARMUKA APLIKASI (GUI TKINTER)
+# 3. MANAJEMEN RIWAYAT CHAT (Session State)
 # ==========================================
-def kirim_pesan():
-    pesan_user = input_user.get()
-    if pesan_user.strip() == "":
-        return
+# Menggantikan fungsi chat_window Tkinter agar riwayat pesan tidak hilang saat web dimuat ulang
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {
+            "role": "assistant", 
+            "content": (
+                "Assalamu'alaikum, Gimana kabarnya, aku berharap Anda semua dalam keadaan sehat ya. "
+                "Saya lagi belajar membuat Chatboot sederhana dan berharap ada manfaatnya untuk kita semua.\n\n"
+                "Mau mulai belajar atau diskusi soal apa hari ini?"
+            )
+        }
+    ]
+
+# Tampilkan seluruh chat yang ada di memori riwayat ke layar web
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        st.write(message["content"])
+
+# ==========================================
+# 4. ANTARMUKA INPUT USER (Menggantikan tk.Entry & Button)
+# ==========================================
+if prompt := st.chat_input("Ketik pesan di sini..."):
+    # Tampilkan pesan ketikan user langsung ke layar web
+    with st.chat_message("user"):
+        st.write(prompt)
+    
+    # Simpan pesan user ke memori riwayat
+    st.session_state.messages.append({"role": "user", "content": prompt})
+
+    # Tampilkan animasi loading saat bot sedang berpikir
+    with st.chat_message("assistant"):
+        placeholder = st.empty()
+        # Ambil jawaban dari AI
+        jawaban_bot = dapatkan_jawaban_ai(prompt)
+        # Tampilkan jawaban di layar web
+        placeholder.write(jawaban_bot)
         
-    # Tampilkan chat dari User ke layar
-    chat_window.config(state=tk.NORMAL)
-    chat_window.insert(tk.END, "Kamu: " + pesan_user + "\n\n")
-    chat_window.config(state=tk.DISABLED)
-    chat_window.yview(tk.END)
-    
-    # Kosongkan kolom input setelah kirim
-    input_user.delete(0, tk.END)
-    
-    # Jalankan proses pemanggilan AI di latar belakang (agar aplikasi tidak membeku)
-    root.after(100, lambda: proses_jawaban_bot(pesan_user))
-
-def proses_jawaban_bot(pesan_user):
-    # Memanggil fungsi AI untuk mendapatkan jawaban
-    jawaban_bot = dapatkan_jawaban_ai(pesan_user)
-    
-    # Tampilkan chat jawaban dari InfoBot ke layar
-    chat_window.config(state=tk.NORMAL)
-    chat_window.insert(tk.END, "InfoBot:\n" + jawaban_bot + "\n\n" + "—" * 40 + "\n\n")
-    chat_window.config(state=tk.DISABLED)
-    chat_window.yview(tk.END)
-
-# Inisialisasi Window Utama
-root = tk.Tk()
-root.title("InfoBot AI (Groq) - Asisten Informatika")
-root.geometry("500x650")
-root.configure(bg="#f4f6f9")
-
-# Judul Header Aplikasi
-header_label = tk.Label(
-    root, 
-    text="💻 Chatboot  Asisten Belajar Informatika (By Musa)", 
-    font=("Helvetica", 12, "bold"), 
-    bg="#17A2B8", # Warna teal cerah khas Groq
-    fg="white", 
-    pady=10
-)
-header_label.pack(fill=tk.X)
-
-# Area Tampilan Chat (Scrollable)
-chat_window = scrolledtext.ScrolledText(
-    root, 
-    wrap=tk.WORD, 
-    state=tk.DISABLED, 
-    bg="#ffffff", 
-    font=("Segoe UI", 10),
-    padx=10,
-    pady=10
-)
-chat_window.pack(padx=15, pady=10, fill=tk.BOTH, expand=True)
-
-# Memasukkan Pesan Sambutan Pertama Kali
-chat_window.config(state=tk.NORMAL)
-chat_window.insert(
-    tk.END, 
-    "Assalamu'alaikum, Gimana kabarnya, aku berharap Anda semua dalam keadaan sehat ya"
-    "Saya lagi belajar membuat Chatboot sederhana dan berharap ada manfaatnya untuk kita seua\n"
-    "Mau mulai belajar atau diskusi soal apa hari ini?\n\n" + "—" * 30 + "\n\n"
-)
-chat_window.config(state=tk.DISABLED)
-
-# Frame Bagian Bawah (Input & Tombol)
-bottom_frame = tk.Frame(root, bg="#f4f6f9")
-bottom_frame.pack(padx=15, pady=10, fill=tk.X)
-
-# Kolom Tempat Mengetik Pesan
-input_user = tk.Entry(
-    bottom_frame, 
-    font=("Segoe UI", 11), 
-    bg="#ffffff", 
-    relief=tk.SOLID, 
-    bd=1
-)
-input_user.pack(side=tk.LEFT, fill=tk.X, expand=True, ipady=8, padx=(0, 10))
-input_user.bind("<Return>", lambda event: kirim_pesan()) # Kirim saat tekan Enter
-
-# Tombol Kirim Chat
-tombol_kirim = tk.Button(
-    bottom_frame, 
-    text="Kirim Pesan", 
-    command=kirim_pesan, 
-    bg="#17A2B8", 
-    fg="white", 
-    font=("Segoe UI", 10, "bold"),
-    relief=tk.FLAT,
-    padx=15,
-    pady=5
-)
-tombol_kirim.pack(side=tk.RIGHT)
-
-# Menjalankan Aplikasi Utama
-root.mainloop()
+    # Simpan jawaban bot ke memori riwayat
+    st.session_state.messages.append({"role": "assistant", "content": jawaban_bot})
