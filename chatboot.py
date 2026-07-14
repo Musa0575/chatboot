@@ -20,7 +20,7 @@ st.markdown("---")
 # ==========================================
 # Membaca API Key dengan aman (Otomatis beralih antara server Streamlit Cloud / Lokal)
 if "GROQ_API_KEY" in st.secrets:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    GROQ_API_KEY = st.secrets["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"]
 else:
     # Isikan API Key kamu di sini jika dijalankan secara lokal di komputer sendiri
     GROQ_API_KEY = "PASTE_API_KEY_GROQ_KAMU_DI_SINI"
